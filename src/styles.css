@@ -254,6 +254,15 @@ button:disabled {
   flex: 0 0 auto;
 }
 
+.auth-form .auth-check input[type="checkbox"] {
+  width: 18px;
+  min-width: 18px;
+  height: 18px;
+  min-height: 18px;
+  padding: 0;
+  margin: 0;
+}
+
 .auth-save {
   margin-bottom: 0;
   color: #ffe5b4;
@@ -1532,14 +1541,16 @@ textarea::placeholder {
   .auth-shell {
     align-items: stretch;
     place-items: stretch;
-    padding: 12px;
+    min-height: 100svh;
+    padding: max(12px, env(safe-area-inset-top)) 10px max(12px, env(safe-area-inset-bottom));
   }
 
   .auth-card-premium {
-    align-content: center;
-    gap: 18px;
-    padding: 18px;
-    min-height: calc(100vh - 24px);
+    align-content: start;
+    gap: 12px;
+    padding: 14px;
+    min-height: auto;
+    overflow: visible;
   }
 
   .auth-glow {
@@ -1547,28 +1558,86 @@ textarea::placeholder {
   }
 
   .auth-hero {
-    gap: 12px;
+    gap: 8px;
   }
 
   .auth-logo-scene {
-    width: min(250px, 72vw);
+    display: none;
+  }
+
+  .auth-brand {
+    display: flex;
+  }
+
+  .auth-brand .brand-mark {
+    width: 42px;
+    height: 42px;
+  }
+
+  .auth-badge {
+    display: none;
   }
 
   .auth-hero h1 {
-    max-width: 12ch;
-    font-size: 2.45rem;
+    max-width: none;
+    font-size: clamp(2rem, 11vw, 2.75rem);
+    line-height: 0.96;
   }
 
   .auth-hero p {
-    font-size: 0.94rem;
+    font-size: 0.92rem;
+    line-height: 1.38;
   }
 
   .auth-form {
     padding: 12px;
+    gap: 9px;
+  }
+
+  .auth-field {
+    gap: 5px;
+  }
+
+  .auth-field input {
+    min-height: 48px;
+    font-size: 1rem;
+  }
+
+  .auth-submit {
+    min-height: 50px;
+  }
+
+  .auth-save {
+    min-height: 46px;
+    font-size: 0.95rem;
+  }
+
+  .auth-check {
+    min-height: 42px;
+    align-items: center;
+    padding: 9px 10px;
+    font-size: 0.82rem;
+    overflow: hidden;
+  }
+
+  .auth-check span {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .auth-form .auth-check input[type="checkbox"] {
+    width: 18px;
+    min-width: 18px;
+    height: 18px;
+    min-height: 18px;
+  }
+
+  .auth-help {
+    display: none;
   }
 
   .auth-security {
-    grid-template-columns: 1fr;
+    display: none;
   }
 
   .workspace {

@@ -1535,7 +1535,7 @@ function AuthScreen({ allowSignup, mode, setMode, message, saving, trustedEmail,
           </div>
           <div className="auth-badge"><ShieldCheck size={16} /> Acceso seguro</div>
           <h1>{isSignup ? 'Crear usuario admin' : 'Intelligence, reimagined.'}</h1>
-          <p>Tu centro privado para catalogo, cuentas, clientes, vencimientos y ganancias. En iPhone puedes guardar la clave en iCloud Keychain y rellenarla con Face ID.</p>
+          <p>Tu centro privado para catalogo, cuentas, clientes, vencimientos y ganancias.</p>
         </div>
 
         <form className="form auth-form" onSubmit={onSubmit} autoComplete={isSignup ? 'on' : 'on'}>
@@ -1576,7 +1576,7 @@ function AuthScreen({ allowSignup, mode, setMode, message, saving, trustedEmail,
           <button className="ghost full auth-save" type="submit" value="save-password" disabled={saving}>
             Guardar contrasena en el navegador
           </button>
-          <p className="auth-help">En iPhone activa Ajustes &gt; Contrasenas &gt; Opciones de contrasenas &gt; Autorrellenar. Safari mostrara Face ID si la clave queda guardada en iCloud Keychain.</p>
+          <p className="auth-help">En iPhone, Safari mostrara Face ID cuando la clave quede guardada en iCloud Keychain.</p>
         </form>
 
         <div className="auth-security">
