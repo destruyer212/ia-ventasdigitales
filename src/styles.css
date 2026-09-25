@@ -233,6 +233,41 @@ button:disabled {
   margin-top: 4px;
 }
 
+.auth-check {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid rgba(37, 201, 255, 0.18);
+  border-radius: 8px;
+  background: rgba(37, 201, 255, 0.06);
+  color: #d9edff;
+  font-size: 0.9rem;
+  line-height: 1.25;
+}
+
+.auth-check input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--brand);
+  flex: 0 0 auto;
+}
+
+.auth-save {
+  margin-bottom: 0;
+  color: #ffe5b4;
+  border-color: rgba(255, 173, 61, 0.28);
+  background: rgba(255, 173, 61, 0.08);
+}
+
+.auth-help {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
 .auth-security {
   grid-column: 2;
   display: grid;

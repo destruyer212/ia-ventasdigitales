@@ -122,6 +122,7 @@ const daysBetween = (from, to) => {
 };
 
 const emptyData = { settings: { exchangeRate: 3.75 }, services: [], accounts: [], sales: [] };
+const trustedEmailKey = 'qyro_trusted_email';
 
 const serviceCategories = [
   'Streaming',
@@ -385,6 +386,7 @@ function App() {
   const [editingServiceId, setEditingServiceId] = useState('');
   const [serviceFormKey, setServiceFormKey] = useState(0);
   const [editingAccountId, setEditingAccountId] = useState('');
+  const [trustedEmail, setTrustedEmail] = useState(() => localStorage.getItem(trustedEmailKey) || '');
   const [saleDraft, setSaleDraft] = useState({
     serviceId: '',
     serviceSearch: '',
@@ -565,8 +567,10 @@ function App() {
     setSaving(true);
     setMessage('');
     const form = new FormData(event.currentTarget);
-    const email = form.get('email');
-    const password = form.get('password');
+    const email = String(form.get('email') || '').trim();
+    const password = String(form.get('password') || '');
+    const trustDevice = form.get('trustedDevice') === 'on';
+    const wantsPasswordSave = trustDevice || event.nativeEvent?.submitter?.value === 'save-password';
     const canSignUp = allowAdminSignup && authMode === 'signup';
     const result =
       canSignUp
@@ -574,7 +578,25 @@ function App() {
         : await supabase.auth.signInWithPassword({ email, password });
 
     if (result.error) setMessage(result.error.message);
-    else if (canSignUp) setMessage('Cuenta creada. Si Supabase pide confirmacion, revisa tu correo.');
+    else {
+      if (trustDevice) {
+        localStorage.setItem(trustedEmailKey, email);
+        setTrustedEmail(email);
+      } else {
+        localStorage.removeItem(trustedEmailKey);
+        setTrustedEmail('');
+      }
+
+      if (wantsPasswordSave && 'PasswordCredential' in window && navigator.credentials?.store) {
+        try {
+          await navigator.credentials.store(new PasswordCredential({ id: email, password, name: 'QYRO' }));
+        } catch {
+          // Safari/iOS decide cuándo mostrar el guardado; si no soporta esta API, el login normal igual activa Keychain.
+        }
+      }
+
+      if (canSignUp) setMessage('Cuenta creada. Si Supabase pide confirmacion, revisa tu correo.');
+    }
     setSaving(false);
   };
 
@@ -877,7 +899,7 @@ function App() {
 
   if (!isSupabaseConfigured) return <SetupScreen />;
   if (loading) return <div className="center-screen">Cargando sistema...</div>;
-  if (!session) return <AuthScreen allowSignup={allowAdminSignup} mode={authMode} setMode={setAuthMode} message={message} saving={saving} onSubmit={handleAuth} />;
+  if (!session) return <AuthScreen allowSignup={allowAdminSignup} mode={authMode} setMode={setAuthMode} message={message} saving={saving} trustedEmail={trustedEmail} onSubmit={handleAuth} />;
 
   return (
     <main className="app-shell">
@@ -1494,7 +1516,7 @@ VITE_SUPABASE_ANON_KEY=tu_anon_public_key`}</pre>
   );
 }
 
-function AuthScreen({ allowSignup, mode, setMode, message, saving, onSubmit }) {
+function AuthScreen({ allowSignup, mode, setMode, message, saving, trustedEmail, onSubmit }) {
   const isSignup = mode === 'signup';
   return (
     <div className="auth-shell">
@@ -1524,6 +1546,7 @@ function AuthScreen({ allowSignup, mode, setMode, message, saving, onSubmit }) {
               type="email"
               inputMode="email"
               placeholder="tu-correo@dominio.com"
+              defaultValue={trustedEmail}
               autoComplete="username"
               autoCapitalize="none"
               autoCorrect="off"
@@ -1542,10 +1565,18 @@ function AuthScreen({ allowSignup, mode, setMode, message, saving, onSubmit }) {
               required
             />
           </label>
+          <label className="auth-check">
+            <input name="trustedDevice" type="checkbox" defaultChecked={Boolean(trustedEmail)} />
+            <span>Confiar en este dispositivo y recordar mi correo</span>
+          </label>
           <button className="primary auth-submit" disabled={saving}>
             <LockKeyhole size={18} />
             {saving ? 'Verificando...' : isSignup ? 'Crear cuenta' : 'Entrar seguro'}
           </button>
+          <button className="ghost full auth-save" type="submit" value="save-password" disabled={saving}>
+            Guardar contrasena en el navegador
+          </button>
+          <p className="auth-help">En iPhone activa Ajustes &gt; Contrasenas &gt; Opciones de contrasenas &gt; Autorrellenar. Safari mostrara Face ID si la clave queda guardada en iCloud Keychain.</p>
         </form>
 
         <div className="auth-security">
