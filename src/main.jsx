@@ -64,10 +64,12 @@ const hasRealAccount = (sale) => Boolean(sale.account) && sale.account !== 'Sin 
 
 // Agrupa las ventas por cuenta comprada. En una cuenta compartida el costo se paga UNA vez
 // y se recupera con la suma de los cupos vendidos (si vendes 3 de 5 y ya cubriste el costo, no pierdes).
-function buildAccountGroups(sales, exchangeRate) {
+function buildAccountGroups(sales, accounts, exchangeRate) {
+  const accountsById = new Map(accounts.map((account) => [account.id, account]));
   const map = new Map();
   sales.forEach((sale) => {
-    const cupos = slotsOf(sale.slots);
+    const linkedAccount = sale.accountId ? accountsById.get(sale.accountId) : null;
+    const cupos = slotsOf(linkedAccount?.maxProfiles || sale.slots);
     const productKey = sale.serviceId || sale.service;
     const key =
       cupos === 1
@@ -77,7 +79,17 @@ function buildAccountGroups(sales, exchangeRate) {
           : hasRealAccount(sale)
             ? `mail:${sale.account.toLowerCase()}|${productKey}`
             : `svc:${productKey}`;
-    const group = map.get(key) || { key, service: sale.service, account: hasRealAccount(sale) ? sale.account : '', slots: 1, sales: [], revenue: 0, unitCost: 0 };
+    const group =
+      map.get(key) || {
+        key,
+        accountId: linkedAccount?.id || sale.accountId || '',
+        service: linkedAccount?.service || sale.service,
+        account: linkedAccount?.email || (hasRealAccount(sale) ? sale.account : ''),
+        slots: 1,
+        sales: [],
+        revenue: 0,
+        unitCost: 0,
+      };
     group.sales.push(sale);
     group.slots = Math.max(group.slots, cupos);
     group.revenue += Number(sale.price || 0);
@@ -500,7 +512,7 @@ function App() {
     setLoading(false);
   };
 
-  const accountGroups = useMemo(() => buildAccountGroups(data.sales, data.settings.exchangeRate), [data.sales, data.settings.exchangeRate]);
+  const accountGroups = useMemo(() => buildAccountGroups(data.sales, data.accounts, data.settings.exchangeRate), [data.sales, data.accounts, data.settings.exchangeRate]);
   const sharedGroups = accountGroups.groups.filter((group) => group.slots > 1);
 
   const stats = useMemo(() => {
@@ -723,6 +735,12 @@ function App() {
       data.services.find((item) => item.id === form.get('serviceId')) ||
       data.services.find((item) => item.name === form.get('serviceSearch'));
     const email = String(form.get('email') || '').trim();
+    const usedProfiles = data.sales.filter((sale) => sale.accountId === account.id || (!sale.accountId && sale.account === account.email)).length;
+    const nextMaxProfiles = Math.max(1, Number(form.get('maxProfiles') || 1));
+    if (nextMaxProfiles < usedProfiles) {
+      setMessage(`No puedes bajar a ${nextMaxProfiles} cupos porque esta cuenta ya tiene ${usedProfiles} ${usedProfiles === 1 ? 'cupo vendido' : 'cupos vendidos'}. Primero libera o elimina una venta.`);
+      return;
+    }
     const payload = {
       service_id: service?.id || null,
       service_name: service?.name || form.get('serviceSearch') || account.service,
@@ -730,7 +748,7 @@ function App() {
       encrypted_password: form.get('password'),
       recovery_note: form.get('recovery'),
       supplier: form.get('supplier'),
-      max_profiles: Math.max(1, Number(form.get('maxProfiles') || 1)),
+      max_profiles: nextMaxProfiles,
       starts_at: form.get('accountStart') || account.start,
       duration_days: durationToDays(form.get('accountDuration') || 30, form.get('accountDurationUnit') || 'days'),
       note: form.get('note'),
