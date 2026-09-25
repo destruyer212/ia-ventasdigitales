@@ -889,13 +889,18 @@ textarea::placeholder {
 
 .duration-control {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 118px;
+  grid-template-columns: minmax(88px, 0.75fr) minmax(128px, 1fr);
   gap: 8px;
 }
 
 .duration-control input,
 .duration-control .select {
   min-width: 0;
+  width: 100%;
+}
+
+.duration-control input[type="number"] {
+  min-width: 88px;
 }
 
 .select {
@@ -1536,9 +1541,13 @@ textarea::placeholder {
 
   .metrics,
   .account-grid,
-  .form-row,
-  .duration-control {
+  .form-row {
     grid-template-columns: 1fr;
+  }
+
+  .duration-control {
+    grid-template-columns: minmax(92px, 0.58fr) minmax(132px, 1fr);
+    align-items: stretch;
   }
 
   .sidebar {
