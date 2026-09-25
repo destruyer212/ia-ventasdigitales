@@ -883,10 +883,10 @@ function App() {
     <main className="app-shell">
       <aside className="sidebar">
         <div className="brand">
-          <div className="brand-mark"><Sparkles size={22} /></div>
+          <div className="brand-mark brand-logo"><img src="/brand/qyro-logo.png" alt="QYRO" /></div>
           <div>
-            <strong>Ventas Digitales</strong>
-            <span>Supabase conectado</span>
+            <strong>QYRO</strong>
+            <span>Intelligence, reimagined</span>
           </div>
         </div>
 
@@ -1470,9 +1470,9 @@ function SetupScreen() {
     <div className="auth-shell">
       <section className="auth-card">
         <div className="brand center-brand">
-          <div className="brand-mark"><Sparkles size={22} /></div>
+          <div className="brand-mark brand-logo"><img src="/brand/qyro-logo.png" alt="QYRO" /></div>
           <div>
-            <strong>Falta configurar Supabase</strong>
+            <strong>QYRO necesita Supabase</strong>
             <span>{supabaseUrl}</span>
           </div>
         </div>
@@ -1491,16 +1491,19 @@ function AuthScreen({ allowSignup, mode, setMode, message, saving, onSubmit }) {
       <section className="auth-card auth-card-premium">
         <div className="auth-glow" />
         <div className="auth-hero">
+          <div className="auth-logo-scene">
+            <img src="/brand/qyro-logo-full.png" alt="QYRO Intelligence, reimagined" />
+          </div>
           <div className="brand center-brand auth-brand">
-            <div className="brand-mark"><Sparkles size={22} /></div>
+            <div className="brand-mark brand-logo"><img src="/brand/qyro-logo.png" alt="QYRO" /></div>
             <div>
-              <strong>Ventas Digitales</strong>
-              <span>{allowSignup ? 'Modo admin de usuarios' : 'Boveda privada conectada a Supabase'}</span>
+              <strong>QYRO</strong>
+              <span>{allowSignup ? 'Modo admin de usuarios' : 'Ventas digitales inteligentes'}</span>
             </div>
           </div>
           <div className="auth-badge"><ShieldCheck size={16} /> Acceso seguro</div>
-          <h1>{isSignup ? 'Crear usuario admin' : 'Controla tu negocio digital'}</h1>
-          <p>En iPhone puedes guardar esta clave en iCloud Keychain y rellenarla con Face ID cuando vuelvas a entrar.</p>
+          <h1>{isSignup ? 'Crear usuario admin' : 'Intelligence, reimagined.'}</h1>
+          <p>Tu centro privado para catalogo, cuentas, clientes, vencimientos y ganancias. En iPhone puedes guardar la clave en iCloud Keychain y rellenarla con Face ID.</p>
         </div>
 
         <form className="form auth-form" onSubmit={onSubmit} autoComplete={isSignup ? 'on' : 'on'}>
