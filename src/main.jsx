@@ -1485,21 +1485,61 @@ VITE_SUPABASE_ANON_KEY=tu_anon_public_key`}</pre>
 }
 
 function AuthScreen({ allowSignup, mode, setMode, message, saving, onSubmit }) {
+  const isSignup = mode === 'signup';
   return (
     <div className="auth-shell">
-      <section className="auth-card">
-        <div className="brand center-brand">
-          <div className="brand-mark"><Sparkles size={22} /></div>
-          <div>
-            <strong>Ventas Digitales</strong>
-            <span>{allowSignup ? 'Modo admin de usuarios' : 'Acceso privado'}</span>
+      <section className="auth-card auth-card-premium">
+        <div className="auth-glow" />
+        <div className="auth-hero">
+          <div className="brand center-brand auth-brand">
+            <div className="brand-mark"><Sparkles size={22} /></div>
+            <div>
+              <strong>Ventas Digitales</strong>
+              <span>{allowSignup ? 'Modo admin de usuarios' : 'Boveda privada conectada a Supabase'}</span>
+            </div>
           </div>
+          <div className="auth-badge"><ShieldCheck size={16} /> Acceso seguro</div>
+          <h1>{isSignup ? 'Crear usuario admin' : 'Controla tu negocio digital'}</h1>
+          <p>En iPhone puedes guardar esta clave en iCloud Keychain y rellenarla con Face ID cuando vuelvas a entrar.</p>
         </div>
-        <form className="form" onSubmit={onSubmit}>
-          <input name="email" type="email" placeholder="Correo" required />
-          <input name="password" type="password" placeholder="Contrasena" minLength="6" required />
-          <button className="primary" disabled={saving}>{mode === 'signup' ? 'Crear cuenta' : 'Entrar'}</button>
+
+        <form className="form auth-form" onSubmit={onSubmit} autoComplete={isSignup ? 'on' : 'on'}>
+          <label className="auth-field">
+            <span>Correo de acceso</span>
+            <input
+              name="email"
+              type="email"
+              inputMode="email"
+              placeholder="tu-correo@dominio.com"
+              autoComplete="username"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck="false"
+              required
+            />
+          </label>
+          <label className="auth-field">
+            <span>Contrasena</span>
+            <input
+              name="password"
+              type="password"
+              placeholder={isSignup ? 'Crea una clave segura' : 'Rellenar con Face ID'}
+              minLength="6"
+              autoComplete={isSignup ? 'new-password' : 'current-password'}
+              required
+            />
+          </label>
+          <button className="primary auth-submit" disabled={saving}>
+            <LockKeyhole size={18} />
+            {saving ? 'Verificando...' : isSignup ? 'Crear cuenta' : 'Entrar seguro'}
+          </button>
         </form>
+
+        <div className="auth-security">
+          <span><Smartphone size={16} /> Compatible con Face ID</span>
+          <span><ShieldCheck size={16} /> Tus datos viven en Supabase</span>
+        </div>
+
         {allowSignup && (
           <button className="ghost full" onClick={() => setMode(mode === 'signup' ? 'login' : 'signup')}>
             {mode === 'signup' ? 'Ir a login' : 'Modo crear usuario'}
