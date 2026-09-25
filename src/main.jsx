@@ -30,6 +30,7 @@ import {
   X,
 } from 'lucide-react';
 import { isSupabaseConfigured, supabase, supabaseUrl } from './supabaseClient';
+import { kokoroImportedServices } from './kokoroProducts';
 import './styles.css';
 
 const todayISO = () => new Date().toISOString().slice(0, 10);
@@ -121,7 +122,8 @@ const daysBetween = (from, to) => {
   return Math.ceil((end - start) / 86400000);
 };
 
-const emptyData = { settings: { exchangeRate: 3.75 }, services: [], accounts: [], sales: [] };
+const baseProviders = ['Shop_KOKORO', 'EM STORE', 'QAMIFY'];
+const emptyData = { settings: { exchangeRate: 3.75 }, services: [], accounts: [], sales: [], providers: [] };
 const trustedEmailKey = 'qyro_trusted_email';
 
 const serviceCategories = [
@@ -218,7 +220,7 @@ Garantia y reembolso:
 
 Compra con confianza en KOKORO SHOP. Servicio rapido, seguro y confiable. Entrega automatica despues de la confirmacion del pago.`;
 
-const sampleServices = [
+const baseSampleServices = [
   { name: 'Disney 4 Plans', category: 'Streaming', costUsd: 0, price: 0, duration: 30 },
   { name: 'Prime Video 2 Plans', category: 'Streaming', costUsd: 0, price: 0, duration: 30 },
   { name: 'Max Plan Standar SBB 1M', category: 'Streaming', costUsd: 2.5, price: 0, duration: 30 },
@@ -317,6 +319,25 @@ const sampleServices = [
   { name: '16 SMS Panels', category: 'Otros', costUsd: 15, price: 0, duration: 30 },
 ];
 
+const withDefaultServiceMeta = (service) => ({
+  provider: 'Shop_KOKORO',
+  stock: 0,
+  slots: 1,
+  ...service,
+});
+
+const mergeServices = (services) => {
+  const seen = new Set();
+  return services.map(withDefaultServiceMeta).filter((service) => {
+    const key = String(service.name || '').trim().toLowerCase();
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+};
+
+const sampleServices = mergeServices([...baseSampleServices, ...kokoroImportedServices]);
+
 function statusFor(end) {
   const diff = daysBetween(todayISO(), end);
   if (diff < 0) return { key: 'expired', label: 'Vencido', tone: 'danger' };
@@ -330,10 +351,18 @@ const fromServiceRow = (row) => ({
   name: row.name,
   description: row.description || '',
   category: row.category,
+  provider: row.provider || 'Shop_KOKORO',
+  stock: Number(row.stock || 0),
   costUsd: Number(row.cost_usd || 0),
   price: Number(row.price_pen || 0),
   duration: Number(row.duration_days || 30),
   slots: slotsOf(row.slots),
+});
+
+const fromProviderRow = (row) => ({
+  id: row.id,
+  name: row.name,
+  note: row.note || '',
 });
 
 const fromAccountRow = (row) => ({
@@ -385,6 +414,7 @@ function App() {
   const [categoryFilter, setCategoryFilter] = useState('Todas');
   const [editingServiceId, setEditingServiceId] = useState('');
   const [serviceFormKey, setServiceFormKey] = useState(0);
+  const [showServiceForm, setShowServiceForm] = useState(false);
   const [editingAccountId, setEditingAccountId] = useState('');
   const [trustedEmail, setTrustedEmail] = useState(() => localStorage.getItem(trustedEmailKey) || '');
   const [saleDraft, setSaleDraft] = useState({
@@ -426,14 +456,16 @@ function App() {
 
   const loadCloudData = async (userId) => {
     setLoading(true);
-    const [servicesResult, accountsResult, salesResult, settingsResult] = await Promise.all([
+    const [servicesResult, accountsResult, salesResult, settingsResult, providersResult] = await Promise.all([
       supabase.from('services').select('*').order('created_at', { ascending: false }),
       supabase.from('master_accounts').select('*').order('created_at', { ascending: false }),
       supabase.from('sales').select('*').order('created_at', { ascending: false }),
       supabase.from('user_settings').select('*').eq('user_id', userId).maybeSingle(),
+      supabase.from('providers').select('*').order('created_at', { ascending: false }),
     ]);
 
-    const error = servicesResult.error || accountsResult.error || salesResult.error || settingsResult.error;
+    const providersMissing = providersResult.error?.code === '42P01' || providersResult.error?.message?.includes('schema cache');
+    const error = servicesResult.error || accountsResult.error || salesResult.error || settingsResult.error || (providersMissing ? null : providersResult.error);
     if (error) {
       const missingTable = error.code === '42P01' || error.message?.includes('schema cache');
       setSchemaMissing(missingTable);
@@ -445,6 +477,7 @@ function App() {
             ...service,
             price: catalogSalePen(service.costUsd, 3.75),
           })),
+          providers: baseProviders.map((name, index) => ({ id: `preview-provider-${index}`, name, note: 'Proveedor base' })),
         });
       }
       setMessage(
@@ -462,6 +495,7 @@ function App() {
       services: servicesResult.data.map(fromServiceRow),
       accounts: accountsResult.data.map(fromAccountRow),
       sales: salesResult.data.map(fromSaleRow),
+      providers: providersMissing ? baseProviders.map((name, index) => ({ id: `base-provider-${index}`, name, note: 'Proveedor base' })) : providersResult.data.map(fromProviderRow),
     });
     setLoading(false);
   };
@@ -519,8 +553,32 @@ function App() {
     [data.services]
   );
 
+  const providerOptions = useMemo(() => {
+    const names = new Set(baseProviders);
+    data.providers.forEach((provider) => provider.name && names.add(provider.name));
+    data.services.forEach((service) => service.provider && names.add(service.provider));
+    return Array.from(names).sort((a, b) => a.localeCompare(b));
+  }, [data.providers, data.services]);
+
+  const providerStats = useMemo(() => {
+    const providers = new Map();
+    providerOptions.forEach((name) => providers.set(name, { id: name, name, note: '', products: 0, stock: 0 }));
+    data.providers.forEach((provider) =>
+      providers.set(provider.name, { ...(providers.get(provider.name) || {}), ...provider, products: providers.get(provider.name)?.products || 0, stock: providers.get(provider.name)?.stock || 0 })
+    );
+    data.services.forEach((service) => {
+      const name = service.provider || 'Sin proveedor';
+      const current = providers.get(name) || { id: name, name, note: '', products: 0, stock: 0 };
+      current.products += 1;
+      current.stock += Number(service.stock || 0);
+      providers.set(name, current);
+    });
+    return Array.from(providers.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [data.providers, data.services, providerOptions]);
+
   const filteredServices = data.services.filter((service) => {
-    const matchesQuery = `${service.name} ${service.category}`.toLowerCase().includes(query.toLowerCase());
+    const normalizedQuery = query.toLowerCase();
+    const matchesQuery = `${service.name} ${service.category} ${service.provider} ${service.stock} ${service.description}`.toLowerCase().includes(normalizedQuery);
     const matchesCategory = categoryFilter === 'Todas' || service.category === categoryFilter;
     return matchesQuery && matchesCategory;
   });
@@ -727,6 +785,7 @@ function App() {
   const addService = async (event) => {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
+    const provider = form.get('provider') || 'Shop_KOKORO';
     const saved = await insertAndReload(
       'services',
       {
@@ -734,6 +793,8 @@ function App() {
         name: form.get('name'),
         description: form.get('description'),
         category: form.get('category'),
+        provider,
+        stock: Math.max(0, Number(form.get('stock') || 0)),
         cost_usd: Number(form.get('costUsd')),
         slots: slotsOf(form.get('slots')),
         price_pen: Number(form.get('price')) || catalogSalePen(Number(form.get('costUsd')), data.settings.exchangeRate, form.get('slots')),
@@ -770,7 +831,7 @@ function App() {
       return;
     }
     setSaving(true);
-    const tableName = { services: 'services', accounts: 'master_accounts', sales: 'sales' }[collection];
+    const tableName = { services: 'services', accounts: 'master_accounts', sales: 'sales', providers: 'providers' }[collection];
     const { error } = await supabase.from(tableName).delete().eq('id', id);
     if (error) setMessage(explainError(error));
     await loadCloudData(session.user.id);
@@ -785,6 +846,8 @@ function App() {
       name: form.get('name'),
       description: form.get('description'),
       category: form.get('category'),
+      provider: form.get('provider') || 'Shop_KOKORO',
+      stock: Math.max(0, Number(form.get('stock') || 0)),
       cost_usd: costUsd,
       slots: slotsOf(form.get('slots')),
       price_pen: Number(form.get('price')) || catalogSalePen(costUsd, data.settings.exchangeRate, form.get('slots')),
@@ -801,6 +864,8 @@ function App() {
                 name: payload.name,
                 description: payload.description,
                 category: payload.category,
+                provider: payload.provider,
+                stock: payload.stock,
                 costUsd: payload.cost_usd,
                 slots: payload.slots,
                 price: payload.price_pen,
@@ -844,22 +909,106 @@ function App() {
           ...service,
           price: catalogSalePen(service.costUsd, data.settings.exchangeRate),
         })),
+        providers: baseProviders.map((name, index) => ({ id: `preview-provider-${index}`, name, note: 'Proveedor base' })),
       });
       setMessage('Catalogo cargado en vista previa. Para guardarlo en Supabase, crea las tablas primero.');
       return;
     }
     setSaving(true);
+    await supabase.from('providers').upsert(
+      baseProviders.map((name) => ({ user_id: session.user.id, name, note: name === 'Shop_KOKORO' ? 'Proveedor principal del catalogo importado' : 'Proveedor base' })),
+      { onConflict: 'user_id,name' }
+    );
     const payload = sampleServices.map((service) => ({
       user_id: session.user.id,
       name: service.name,
       description: service.description || '',
       category: service.category,
+      provider: service.provider || 'Shop_KOKORO',
+      stock: Number(service.stock || 0),
       cost_usd: service.costUsd,
       price_pen: service.price || catalogSalePen(service.costUsd, data.settings.exchangeRate),
       duration_days: service.duration,
+      slots: slotsOf(service.slots),
     }));
     const { error } = await supabase.from('services').insert(payload);
     if (error) setMessage(explainError(error));
+    await loadCloudData(session.user.id);
+    setSaving(false);
+  };
+
+  const addProvider = async (event) => {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const name = String(form.get('name') || '').trim();
+    if (!name) return;
+    if (schemaMissing) {
+      setData({
+        ...data,
+        providers: [...data.providers, { id: `preview-provider-${Date.now()}`, name, note: form.get('note') || '' }],
+      });
+      event.currentTarget.reset();
+      return;
+    }
+    const saved = await insertAndReload(
+      'providers',
+      { user_id: session.user.id, name, note: form.get('note') || '' },
+      event.currentTarget
+    );
+    if (saved) setMessage(`Proveedor ${name} guardado.`);
+  };
+
+  const importKokoroProducts = async () => {
+    if (schemaMissing) {
+      const current = data.services.map((service) => ({ provider: service.provider || 'Shop_KOKORO', stock: Number(service.stock || 0), ...service }));
+      const merged = mergeServices([...current, ...kokoroImportedServices]);
+      setData({
+        ...data,
+        services: merged.map((service, index) => ({ id: service.id || `preview-import-${index}`, ...service, price: service.price || catalogSalePen(service.costUsd, data.settings.exchangeRate, service.slots) })),
+        providers: baseProviders.map((name, index) => ({ id: `preview-provider-${index}`, name, note: 'Proveedor base' })),
+      });
+      setMessage('Productos Shop_KOKORO cargados en vista previa.');
+      return;
+    }
+
+    setSaving(true);
+    setMessage('');
+    const providerRows = baseProviders.map((name) => ({
+      user_id: session.user.id,
+      name,
+      note: name === 'Shop_KOKORO' ? 'Proveedor principal del catalogo Shop_KOKORO' : 'Proveedor base',
+    }));
+    const providerResult = await supabase.from('providers').upsert(providerRows, { onConflict: 'user_id,name' });
+    const providerError = providerResult.error;
+    const normalize = (value) => String(value || '').trim().toLowerCase();
+    const existingByName = new Map(data.services.map((service) => [normalize(service.name), service]));
+    const fixExisting = data.services
+      .filter((service) => !service.provider)
+      .map((service) => supabase.from('services').update({ provider: 'Shop_KOKORO', stock: Number(service.stock || 0) }).eq('id', service.id));
+    const results = await Promise.all([
+      ...fixExisting,
+      ...kokoroImportedServices.map((service) => {
+        const existing = existingByName.get(normalize(service.name));
+        const payload = {
+          user_id: session.user.id,
+          name: service.name,
+          description: service.description || '',
+          category: service.category || 'Otros',
+          provider: service.provider || 'Shop_KOKORO',
+          stock: Number(service.stock || 0),
+          cost_usd: Number(service.costUsd || 0),
+          price_pen: Number(service.price || catalogSalePen(service.costUsd, data.settings.exchangeRate, service.slots)),
+          duration_days: Number(service.duration || 30),
+          slots: slotsOf(service.slots),
+        };
+        return existing
+          ? supabase.from('services').update(payload).eq('id', existing.id)
+          : supabase.from('services').insert(payload);
+      }),
+    ]);
+    const error = providerError || results.find((result) => result.error)?.error;
+    if (error) setMessage(explainError(error));
+    else setMessage(`Shop_KOKORO importado: ${kokoroImportedServices.length} productos revisados con proveedor y stock.`);
     await loadCloudData(session.user.id);
     setSaving(false);
   };
@@ -919,6 +1068,7 @@ function App() {
           <button className={view === 'clients' ? 'active' : ''} onClick={() => setView('clients')}><UserRound /> Clientes</button>
           <button className={view === 'newAccount' ? 'active' : ''} onClick={() => setView('newAccount')}><LockKeyhole /> Nueva cuenta</button>
           <button className={view === 'registeredAccounts' ? 'active' : ''} onClick={() => setView('registeredAccounts')}><ShieldCheck /> Cuentas registradas</button>
+          <button className={view === 'providers' ? 'active' : ''} onClick={() => setView('providers')}><Tag /> Proveedores</button>
           <button className={view === 'services' ? 'active' : ''} onClick={() => setView('services')}><ShieldCheck /> Servicios</button>
         </nav>
 
@@ -933,7 +1083,7 @@ function App() {
         <header className="topbar">
           <div>
             <p className="eyebrow">Control del negocio</p>
-            <h1>{view === 'dashboard' ? 'Panel maestro' : view === 'sell' ? 'Vender' : view === 'registeredSales' ? 'Ventas registradas' : view === 'clients' ? 'Clientes' : view === 'newAccount' ? 'Nueva cuenta' : view === 'registeredAccounts' ? 'Cuentas registradas' : 'Catalogo de servicios'}</h1>
+            <h1>{view === 'dashboard' ? 'Panel maestro' : view === 'sell' ? 'Vender' : view === 'registeredSales' ? 'Ventas registradas' : view === 'clients' ? 'Clientes' : view === 'newAccount' ? 'Nueva cuenta' : view === 'registeredAccounts' ? 'Cuentas registradas' : view === 'providers' ? 'Proveedores' : 'Catalogo de servicios'}</h1>
           </div>
           <label className="rate-box">
             <DollarSign size={17} />
@@ -1253,6 +1403,46 @@ function App() {
           </section>
         )}
 
+        {view === 'providers' && (
+          <section className="single-panel wide">
+            <section className="grid-two provider-view">
+              <Panel title="Nuevo proveedor" icon={<Plus />}>
+                <form className="form" onSubmit={addProvider}>
+                  <Field label="Nombre del proveedor">
+                    <input name="name" placeholder="Ej: Shop_KOKORO, EM STORE, QAMIFY" required />
+                  </Field>
+                  <Field label="Nota">
+                    <textarea name="note" placeholder="Contacto, canal, condiciones, pais, etc." />
+                  </Field>
+                  <button className="primary" disabled={saving}><Plus size={18} /> Guardar proveedor</button>
+                </form>
+              </Panel>
+
+              <Panel title="Proveedores registrados" icon={<Tag />}>
+                <div className="provider-grid">
+                  {providerStats.map((provider) => (
+                    <article className="provider-card" key={provider.id || provider.name}>
+                      <div>
+                        <strong>{provider.name}</strong>
+                        <span>{provider.note || 'Sin nota'}</span>
+                      </div>
+                      <div className="provider-stats">
+                        <span>{provider.products} productos</span>
+                        <span>{provider.stock} stock total</span>
+                      </div>
+                      {!baseProviders.includes(provider.name) && (
+                        <button className="icon-danger" title="Eliminar proveedor" onClick={() => removeItem('providers', provider.id)}>
+                          <Trash2 size={16} />
+                        </button>
+                      )}
+                    </article>
+                  ))}
+                </div>
+              </Panel>
+            </section>
+          </section>
+        )}
+
         {view === 'services' && (
           <section className="catalog-view">
             <section className="catalog-hero">
@@ -1263,9 +1453,19 @@ function App() {
               </div>
               <div className="hero-actions">
                 {data.services.length === 0 && <button className="primary" onClick={seedServices} disabled={saving}><Sparkles size={18} /> Cargar catalogo completo</button>}
+                <button className="ghost" onClick={importKokoroProducts} disabled={saving}><Sparkles size={18} /> Importar Shop_KOKORO</button>
                 {data.services.length > 0 && <button className="primary" onClick={applyCatalogMarkup} disabled={saving}><DollarSign size={18} /> Aplicar x2 a todos</button>}
                 {data.services.length > 0 && <button className="ghost" onClick={() => downloadCatalogMarkdown(data.services, data.settings.exchangeRate)}><Download size={18} /> Exportar .md</button>}
               </div>
+            </section>
+
+            <section className="catalog-search-row">
+              <label className="search catalog-search">
+                <Search size={18} />
+                <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Buscar producto, proveedor, categoria o descripcion" />
+                {query && <button type="button" title="Limpiar busqueda" onClick={() => setQuery('')}><X size={16} /></button>}
+              </label>
+              <button className="primary mobile-product-toggle" onClick={() => setShowServiceForm(true)}><Plus size={18} /> Nuevo producto</button>
             </section>
 
             <section className="catalog-toolbar">
@@ -1279,11 +1479,17 @@ function App() {
             </section>
 
             <section className="catalog-layout">
+              <div className={showServiceForm ? 'catalog-form-panel is-open' : 'catalog-form-panel'}>
               <Panel title="Nuevo producto" icon={<Plus />}>
                 <form className="form" onSubmit={addService} key={serviceFormKey}>
+                  <button type="button" className="ghost mobile-form-close" onClick={() => setShowServiceForm(false)}><X size={16} /> Cerrar</button>
                   <Field label="Nombre del producto"><input name="name" placeholder="Ej: Prime Video 6M" required /></Field>
                   <Field label="Descripcion"><textarea name="description" placeholder="Descripcion / condiciones del producto" /></Field>
                   <Field label="Categoria"><Select name="category" options={serviceCategories} /></Field>
+                  <div className="form-row">
+                    <Field label="Proveedor"><Select name="provider" options={providerOptions} defaultValue="Shop_KOKORO" /></Field>
+                    <Field label="Stock"><input name="stock" type="number" min="0" step="1" defaultValue="0" /></Field>
+                  </div>
                   <Field label="Duracion">
                     <div className="duration-control">
                       <input name="duration" type="number" placeholder="Duracion" defaultValue="1" />
@@ -1295,6 +1501,7 @@ function App() {
                   <button className="primary" disabled={saving}><Plus size={18} /> Agregar producto</button>
                 </form>
               </Panel>
+              </div>
 
               <section className="catalog-grid">
                 {filteredServices.map((service) => (
@@ -1307,6 +1514,7 @@ function App() {
                     onCancel={() => setEditingServiceId('')}
                     onSave={(event) => updateService(event, service.id)}
                     onDelete={() => removeItem('services', service.id)}
+                    providerOptions={providerOptions}
                   />
                 ))}
                 {filteredServices.length === 0 && <Empty text="No hay productos en esta categoria." />}
@@ -1319,9 +1527,9 @@ function App() {
   );
 }
 
-function ServiceCard({ service, exchangeRate, editing, onEdit, onCancel, onSave, onDelete }) {
+function ServiceCard({ service, exchangeRate, editing, onEdit, onCancel, onSave, onDelete, providerOptions }) {
   if (editing) {
-    return <ServiceEditForm service={service} exchangeRate={exchangeRate} onCancel={onCancel} onSave={onSave} />;
+    return <ServiceEditForm service={service} exchangeRate={exchangeRate} providerOptions={providerOptions} onCancel={onCancel} onSave={onSave} />;
   }
 
   return (
@@ -1335,19 +1543,19 @@ function ServiceCard({ service, exchangeRate, editing, onEdit, onCancel, onSave,
       </div>
       <div>
         <strong>{service.name}</strong>
-        <span>{service.category}</span>
+        <span>{service.category} · {service.provider || 'Sin proveedor'}</span>
         {service.description && <small className="service-description">{service.description}</small>}
       </div>
       <PriceBreakdown costUsd={service.costUsd} exchangeRate={exchangeRate} slots={service.slots} finalPen={service.price} />
       <div className="service-meta">
-        <span>{service.duration} dias{slotsOf(service.slots) > 1 ? ` · ${slotsOf(service.slots)} cupos` : ''} · TC {Number(exchangeRate || 3.75).toFixed(2)}</span>
+        <span>{service.duration} dias{slotsOf(service.slots) > 1 ? ` · ${slotsOf(service.slots)} cupos` : ''} · Stock {Number(service.stock || 0)} · TC {Number(exchangeRate || 3.75).toFixed(2)}</span>
         <button type="button" className="card-link" onClick={onEdit}><Pencil size={14} /> Editar precios</button>
       </div>
     </article>
   );
 }
 
-function ServiceEditForm({ service, exchangeRate, onCancel, onSave }) {
+function ServiceEditForm({ service, exchangeRate, providerOptions, onCancel, onSave }) {
   const cardRef = useRef(null);
 
   useEffect(() => {
@@ -1375,6 +1583,14 @@ function ServiceEditForm({ service, exchangeRate, onCancel, onSave }) {
             <div className="form-row">
               <Field label="Categoria">
                 <Select name="category" options={serviceCategories} defaultValue={service.category} />
+              </Field>
+              <Field label="Proveedor">
+                <Select name="provider" options={providerOptions} defaultValue={service.provider || 'Shop_KOKORO'} />
+              </Field>
+            </div>
+            <div className="form-row">
+              <Field label="Stock">
+                <input name="stock" type="number" min="0" step="1" defaultValue={Number(service.stock || 0)} />
               </Field>
               <Field label="Duracion">
                 <div className="duration-control">
@@ -1466,14 +1682,14 @@ function catalogMarkdown(services, exchangeRate) {
       .filter((service) => (service.category || 'Otros') === category)
       .sort((a, b) => a.name.localeCompare(b.name));
     lines.push(`## ${category} (${items.length})`, '');
-    lines.push('| Producto | Duracion | Cupos | Compra USD | Costo real S/ | Venta x2 S/ | Precio final S/ |');
-    lines.push('|---|---:|---:|---:|---:|---:|---:|');
+    lines.push('| Producto | Proveedor | Stock | Duracion | Cupos | Compra USD | Costo real S/ | Venta x2 S/ | Precio final S/ |');
+    lines.push('|---|---|---:|---:|---:|---:|---:|---:|---:|');
     items.forEach((service) => {
       const cupos = slotsOf(service.slots);
       const hasCost = Number(service.costUsd || 0) > 0;
       const slotCost = realCostPen(service.costUsd, rate) / cupos;
       lines.push(
-        `| ${cell(service.name)} | ${service.duration} dias | ${cupos} | ${hasCost ? usd(service.costUsd) : '-'} | ${hasCost ? slotCost.toFixed(2) : '-'} | ${hasCost ? catalogSalePen(service.costUsd, rate, cupos).toFixed(2) : '-'} | ${Number(service.price || 0) > 0 ? Number(service.price).toFixed(2) : '-'} |`
+        `| ${cell(service.name)} | ${cell(service.provider || 'Sin proveedor')} | ${Number(service.stock || 0)} | ${service.duration} dias | ${cupos} | ${hasCost ? usd(service.costUsd) : '-'} | ${hasCost ? slotCost.toFixed(2) : '-'} | ${hasCost ? catalogSalePen(service.costUsd, rate, cupos).toFixed(2) : '-'} | ${Number(service.price || 0) > 0 ? Number(service.price).toFixed(2) : '-'} |`
       );
     });
     lines.push('');
@@ -1625,7 +1841,7 @@ function ServicePicker({ services, value, selectedId, exchangeRate, onInput, onS
   const terms = normalize(value).split(/\s+/).filter(Boolean);
   const filtered = services
     .filter((service) => {
-      const haystack = normalize(`${service.name} ${service.category} ${service.description} ${service.duration}d ${service.duration} dias`);
+      const haystack = normalize(`${service.name} ${service.category} ${service.provider} stock ${service.stock} ${service.description} ${service.duration}d ${service.duration} dias`);
       return terms.every((term) => haystack.includes(term));
     })
     .slice(0, 20);
@@ -1677,7 +1893,7 @@ function ServicePicker({ services, value, selectedId, exchangeRate, onInput, onS
       </div>
       {selected && (
         <div className="selected-service">
-          <span>{selected.category} · {selected.duration} dias</span>
+          <span>{selected.category} · {selected.provider || 'Sin proveedor'} · {selected.duration} dias</span>
           <strong>{Number(selected.price || 0) > 0 ? money(selected.price) : 'Precio manual'}</strong>
         </div>
       )}
@@ -1690,6 +1906,8 @@ function ServicePicker({ services, value, selectedId, exchangeRate, onInput, onS
           <div className="detail-grid">
             <span>Categoria: {selected.category}</span>
             <span>Duracion: {selected.duration} dias</span>
+            <span>Proveedor: {selected.provider || 'Sin proveedor'}</span>
+            <span>Stock: {Number(selected.stock || 0)}</span>
           </div>
           <PriceBreakdown costUsd={selected.costUsd} exchangeRate={exchangeRate} slots={selected.slots} finalPen={selected.price} />
         </div>
@@ -1710,7 +1928,7 @@ function ServicePicker({ services, value, selectedId, exchangeRate, onInput, onS
               >
                 <span>
                   <strong>{service.name}</strong>
-                  <small>{service.category} · {service.duration} dias</small>
+                  <small>{service.category} · {service.provider || 'Sin proveedor'} · {service.duration} dias · Stock {Number(service.stock || 0)}</small>
                 </span>
                 <em className={hasPrice ? '' : 'manual-price'}>{hasPrice ? money(service.price) : 'Sin precio'}</em>
               </button>

@@ -6,11 +6,22 @@ create table if not exists public.services (
   name text not null,
   description text,
   category text not null default 'Streaming',
+  provider text,
+  stock int not null default 0,
   cost_usd numeric(12,2) not null default 0,
   price_pen numeric(12,2) not null default 0,
   duration_days int not null default 30,
   slots int not null default 1,
   created_at timestamptz not null default now()
+);
+
+create table if not exists public.providers (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  name text not null,
+  note text,
+  created_at timestamptz not null default now(),
+  unique(user_id, name)
 );
 
 create table if not exists public.master_accounts (
@@ -59,12 +70,14 @@ create table if not exists public.user_settings (
 );
 
 create index if not exists services_user_id_idx on public.services(user_id);
+create index if not exists providers_user_id_idx on public.providers(user_id);
 create index if not exists master_accounts_user_id_idx on public.master_accounts(user_id);
 create index if not exists sales_user_id_idx on public.sales(user_id);
 create index if not exists sales_ends_at_idx on public.sales(ends_at);
 create index if not exists sales_master_account_id_idx on public.sales(master_account_id);
 
 alter table public.services enable row level security;
+alter table public.providers enable row level security;
 alter table public.master_accounts enable row level security;
 alter table public.sales enable row level security;
 alter table public.user_settings enable row level security;
@@ -89,6 +102,28 @@ create policy "Users can update own services"
 
 create policy "Users can delete own services"
   on public.services for delete
+  using (auth.uid() = user_id);
+
+drop policy if exists "Users can read own providers" on public.providers;
+drop policy if exists "Users can insert own providers" on public.providers;
+drop policy if exists "Users can update own providers" on public.providers;
+drop policy if exists "Users can delete own providers" on public.providers;
+
+create policy "Users can read own providers"
+  on public.providers for select
+  using (auth.uid() = user_id);
+
+create policy "Users can insert own providers"
+  on public.providers for insert
+  with check (auth.uid() = user_id);
+
+create policy "Users can update own providers"
+  on public.providers for update
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+create policy "Users can delete own providers"
+  on public.providers for delete
   using (auth.uid() = user_id);
 
 drop policy if exists "Users can read own master accounts" on public.master_accounts;
@@ -171,6 +206,7 @@ from public.sales;
 
 grant usage on schema public to anon, authenticated;
 grant select, insert, update, delete on public.services to authenticated;
+grant select, insert, update, delete on public.providers to authenticated;
 grant select, insert, update, delete on public.master_accounts to authenticated;
 grant select, insert, update, delete on public.sales to authenticated;
 grant select, insert, update on public.user_settings to authenticated;
@@ -181,4 +217,7 @@ alter default privileges in schema public
 
 -- Migracion para bases existentes (cuentas compartidas por cupos).
 alter table public.services add column if not exists slots int not null default 1;
+alter table public.services add column if not exists provider text;
+alter table public.services add column if not exists stock int not null default 0;
+update public.services set provider = 'Shop_KOKORO' where provider is null or provider = '';
 alter table public.sales add column if not exists slots int not null default 1;
