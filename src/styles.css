@@ -1472,6 +1472,9 @@ textarea::placeholder {
 
   .catalog-layout > .panel {
     position: static;
+    max-height: none;
+    overflow: visible;
+    overscroll-behavior: auto;
   }
 }
 
@@ -1519,7 +1522,7 @@ textarea::placeholder {
   }
 
   .workspace {
-    padding: 16px 14px 88px;
+    padding: 16px 14px 112px;
     gap: 16px;
   }
 
@@ -1540,6 +1543,16 @@ textarea::placeholder {
 
   .sidebar {
     position: static;
+    height: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    backdrop-filter: none;
+  }
+
+  .sidebar > .brand,
+  .sidebar > .cloud-box {
+    display: none;
   }
 
   .brand-mark {
@@ -1549,17 +1562,19 @@ textarea::placeholder {
 
   nav {
     position: fixed;
-    left: 10px;
-    right: 10px;
-    bottom: 10px;
-    z-index: 30;
+    left: max(10px, env(safe-area-inset-left));
+    right: max(10px, env(safe-area-inset-right));
+    bottom: max(10px, env(safe-area-inset-bottom));
+    z-index: 100;
     grid-template-columns: repeat(5, minmax(0, 1fr));
     padding: 8px;
     border: 1px solid var(--line);
     border-radius: 8px;
-    background: rgba(5, 9, 20, 0.88);
-    backdrop-filter: blur(18px);
-    box-shadow: var(--shadow);
+    background:
+      linear-gradient(135deg, rgba(37, 201, 255, 0.1), rgba(255, 173, 61, 0.08)),
+      rgba(3, 6, 12, 0.94);
+    backdrop-filter: blur(20px);
+    box-shadow: 0 20px 70px rgba(0, 0, 0, 0.56), var(--ring);
   }
 
   nav button {
@@ -1568,8 +1583,14 @@ textarea::placeholder {
     justify-items: center;
     align-content: center;
     gap: 3px;
-    font-size: 0.72rem;
-    padding: 4px;
+    font-size: clamp(0.62rem, 2.7vw, 0.72rem);
+    padding: 4px 2px;
+    white-space: nowrap;
+  }
+
+  nav button svg {
+    width: 18px;
+    height: 18px;
   }
 
   .sale-money {
@@ -1609,6 +1630,8 @@ textarea::placeholder {
 
   .catalog-hero {
     display: grid;
+    gap: 14px;
+    padding: 14px;
   }
 
   .hero-actions,
@@ -1618,10 +1641,44 @@ textarea::placeholder {
 
   .catalog-grid {
     grid-template-columns: 1fr;
+    gap: 10px;
   }
 
   .service-card {
     min-height: 190px;
+  }
+
+  .catalog-layout {
+    gap: 12px;
+  }
+
+  .catalog-layout > .panel {
+    max-height: none;
+    overflow: visible;
+    overscroll-behavior: auto;
+    touch-action: pan-y;
+  }
+
+  .catalog-layout,
+  .catalog-grid,
+  .catalog-layout > .panel,
+  .service-card,
+  .form {
+    touch-action: pan-y;
+  }
+
+  .catalog-toolbar {
+    margin-left: -14px;
+    margin-right: -14px;
+    border-left: 0;
+    border-right: 0;
+    border-radius: 0;
+    scrollbar-width: none;
+    touch-action: pan-x pan-y;
+  }
+
+  .catalog-toolbar::-webkit-scrollbar {
+    display: none;
   }
 }
 
