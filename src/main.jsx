@@ -892,7 +892,8 @@ function App() {
 
         <nav>
           <button className={view === 'dashboard' ? 'active' : ''} onClick={() => setView('dashboard')}><LayoutDashboard /> Panel</button>
-          <button className={view === 'sales' ? 'active' : ''} onClick={() => setView('sales')}><WalletCards /> Ventas</button>
+          <button className={view === 'sell' ? 'active' : ''} onClick={() => setView('sell')}><Plus /> Vender</button>
+          <button className={view === 'registeredSales' ? 'active' : ''} onClick={() => setView('registeredSales')}><WalletCards /> Ventas registradas</button>
           <button className={view === 'clients' ? 'active' : ''} onClick={() => setView('clients')}><UserRound /> Clientes</button>
           <button className={view === 'accounts' ? 'active' : ''} onClick={() => setView('accounts')}><LockKeyhole /> Cuentas</button>
           <button className={view === 'services' ? 'active' : ''} onClick={() => setView('services')}><ShieldCheck /> Servicios</button>
@@ -909,7 +910,7 @@ function App() {
         <header className="topbar">
           <div>
             <p className="eyebrow">Control del negocio</p>
-            <h1>{view === 'dashboard' ? 'Panel maestro' : view === 'sales' ? 'Ventas y perfiles' : view === 'clients' ? 'Clientes' : view === 'accounts' ? 'Boveda de cuentas' : 'Catalogo de servicios'}</h1>
+            <h1>{view === 'dashboard' ? 'Panel maestro' : view === 'sell' ? 'Vender' : view === 'registeredSales' ? 'Ventas registradas' : view === 'clients' ? 'Clientes' : view === 'accounts' ? 'Boveda de cuentas' : 'Catalogo de servicios'}</h1>
           </div>
           <label className="rate-box">
             <DollarSign size={17} />
@@ -982,9 +983,9 @@ function App() {
           </>
         )}
 
-        {view === 'sales' && (
-          <section className="grid-two">
-            <Panel title="Nueva venta" icon={<Plus />}>
+        {view === 'sell' && (
+          <section className="single-panel">
+            <Panel title="Vender" icon={<Plus />}>
               <form className="form" onSubmit={addSale}>
                 <div className="form-row">
                   <Field label="Cliente"><input name="client" placeholder="Nombre del cliente" required /></Field>
@@ -1043,7 +1044,11 @@ function App() {
                 <button className="primary" disabled={saving}><Plus size={18} /> Registrar venta</button>
               </form>
             </Panel>
+          </section>
+        )}
 
+        {view === 'registeredSales' && (
+          <section className="single-panel wide">
             <Panel title="Ventas registradas" icon={<Users />}>
               <button className={showSecrets ? 'ghost toggle-on' : 'ghost'} onClick={() => setShowSecrets(!showSecrets)} aria-pressed={showSecrets}>
                 {showSecrets ? <EyeOff size={18} /> : <Eye size={18} />}

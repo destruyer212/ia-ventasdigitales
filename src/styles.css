@@ -538,6 +538,16 @@ textarea::placeholder {
   gap: 16px;
 }
 
+.single-panel {
+  display: grid;
+  grid-template-columns: minmax(0, min(760px, 100%));
+  gap: 16px;
+}
+
+.single-panel.wide {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .panel {
   padding: 18px;
 }
@@ -1452,7 +1462,7 @@ textarea::placeholder {
   }
 
   nav {
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-columns: repeat(6, minmax(0, 1fr));
     gap: 8px;
   }
 
@@ -1575,7 +1585,7 @@ textarea::placeholder {
     right: max(10px, env(safe-area-inset-right));
     bottom: max(10px, env(safe-area-inset-bottom));
     z-index: 100;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-columns: repeat(6, minmax(0, 1fr));
     padding: 8px;
     border: 1px solid var(--line);
     border-radius: 8px;
@@ -1587,14 +1597,16 @@ textarea::placeholder {
   }
 
   nav button {
-    min-height: 48px;
+    min-height: 56px;
     display: grid;
     justify-items: center;
     align-content: center;
     gap: 3px;
-    font-size: clamp(0.62rem, 2.7vw, 0.72rem);
+    font-size: clamp(0.52rem, 2.35vw, 0.68rem);
+    line-height: 1.05;
     padding: 4px 2px;
-    white-space: nowrap;
+    white-space: normal;
+    text-align: center;
   }
 
   nav button svg {
